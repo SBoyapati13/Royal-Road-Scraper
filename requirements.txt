@@ -1,0 +1,11 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+pandas>=2.0.0
+plotly>=5.14.0
+streamlit>=1.28.0
+
+# Optional type checking packages
+mypy>=1.8.0
+types-requests>=2.31.0
+types-beautifulsoup4>=4.12.0
+pandas-stubs>=2.0.0
