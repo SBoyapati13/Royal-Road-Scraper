@@ -1,93 +1,89 @@
-# Royal Road Fiction Hourly Scraper
+# Royal Road Fiction Analysis
 
-This project scrapes data from Royal Road fiction website on an hourly basis to collect time-series data for analysis.
+A data analysis project for tracking and analyzing trending stories on Royal Road, a popular web fiction platform.
 
+## Features
 
+- **Web Scraping**: Collection of story data from Royal Road's trending page
+- **Data Storage**: SQLite database for efficient storage and retrieval of story metrics
+- **Exploratory Data Analysis**: Comprehensive analysis of story metrics, genres, and trends
+- **Visualization**: Interactive charts and plots to explore the data
+- **Time-series Analysis**: Track changes in story metrics over time with multiple manual data collections
 
 ## Project Structure
 
 - `scraper.py` - The main scraper module that extracts data from Royal Road
 - `database.py` - Database handling for storing and retrieving scraped data
-- `scheduled_scraper.py` - Entry point for the scheduled scraper task
-- `setup_scheduler.ps1` - PowerShell script to set up the Windows Task Scheduler
-- `setup_scheduler.bat` - Batch file to set up the Windows Task Scheduler with admin privileges
-- `royal_road_eda.ipynb` - Jupyter Notebook for Exploratory Data Analysis
+- `royal_road_eda.ipynb` - Jupyter notebook for exploratory data analysis
 - `requirements.txt` - Python package dependencies
 
-## Setup Instructions
+## Setup
 
-1. Make sure all required packages are installed:
+1. Clone the repository:
    ```
+   git clone https://github.com/SBoyapati13/Royal-Road-Scraper.git
+   cd Royal-Road-Scraper
+   ```
+
+2. Create a virtual environment and install dependencies:
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate  # On Windows
    pip install -r requirements.txt
    ```
 
-2. Set up the hourly scheduler:
-
-   **Option 1: Using the batch file (Recommended)**
-   
-   Right-click on `setup_scheduler.bat` and select "Run as Administrator", then follow the prompts.
-   
-   **Option 2: Using PowerShell**
-   ```
-   powershell -ExecutionPolicy Bypass -File setup_scheduler.ps1
-   ```
-
-3. Either method will create a Windows Task Scheduler task named "RoyalRoadScraper" that runs hourly.
-
-4. If you encounter permission issues, you can manually create the task in Task Scheduler:
-   - Open Task Scheduler (taskschd.msc)
-   - Create a Basic Task named "RoyalRoadScraper"
-   - Set it to run hourly
-   - Set the action to run program: `<python executable path>`
-   - With arguments: `<path to scheduled_scraper.py>`
-   - Set "Start in" to the project directory
 
 
+## Usage
 
-## How It Works
+### Data Collection
 
-- The scheduler will run the `scheduled_scraper.py` script every hour
-- Data is scraped from Royal Road's trending page
-- Stories are stored in a SQLite database in the `data` directory
-- Each scraping session is logged in the database and in log files
-
-## Log Files
-
-Log files are stored in the `logs` directory with timestamps in the filename format:
-```
-logs/scraper_YYYYMMDD_HHMMSS.log
-```
-
-## Manual Execution
-
-To manually trigger the scraper:
+Run the scraper manually whenever you want to collect new data:
 
 ```
-python scheduled_scraper.py
+python scraper.py
 ```
 
-## Task Scheduler Management
+For time-series analysis, it's recommended to run the scraper multiple times daily at regular intervals.
 
-To manually run the scheduled task:
-```
-schtasks /Run /TN "RoyalRoadScraper"
-```
+### Data Analysis
 
-To check the status of the scheduled task:
+Open the Jupyter notebook for analysis:
+
 ```
-schtasks /Query /TN "RoyalRoadScraper"
+jupyter notebook royal_road_eda.ipynb
 ```
 
-To remove the scheduled task:
-```
-schtasks /Delete /TN "RoyalRoadScraper" /F
-```
+The notebook provides:
+- Distribution analysis of key metrics (views, ratings, followers)
+- Correlation analysis between different story attributes
+- Genre popularity and performance analysis
+- Story length impact assessment
+- Time-series analysis (when multiple data points are available)
 
-## Time-series Analysis
+## Database Structure
 
-The hourly data collection enables time-series analysis in the `royal_road_eda.ipynb` notebook, tracking how story metrics change over time:
+The SQLite database (`data/royal_road.db`) contains two main tables:
 
-- Changes in views, ratings, and followers
-- Daily/weekly trends in story popularity
-- Growth rates for different genres
-- Impact of new chapter releases on metrics
+1. `stories` - Stores story details and metrics
+   - id, title, url, rating, followers, pages, chapters, views, favorites, ratings_count, genres, scraped_date
+
+2. `scrape_history` - Logs each scraping session
+   - id, scrape_date, pages_scraped, stories_added, stories_updated, status, notes
+
+## Data Analysis Highlights
+
+- **Distribution Analysis**: Examine right-skewed distributions with automatic log scaling
+- **Correlation Heatmaps**: Visualize relationships between different story metrics
+- **Genre Analysis**: Identify popular and high-performing genres
+- **Story Length Impact**: Understand how story length affects popularity metrics
+- **Time-Series Insights**: Track changes in story metrics over time (requires multiple manual scrapes)
+
+## License
+
+MIT
+
+## Acknowledgments
+
+- [Royal Road](https://www.royalroad.com/) for providing the platform and data source
+- All the authors who contribute to the web fiction community
