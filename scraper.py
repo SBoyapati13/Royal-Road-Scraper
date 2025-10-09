@@ -168,13 +168,23 @@ class RoyalRoadScraper:
         self.logger = logging.getLogger('RoyalRoadScraper')
         self.logger.setLevel(log_level)
         
-        # Create console handler with formatting
+        # Create console handler with formatting if it doesn't exist
         if not self.logger.handlers:
             console_handler = logging.StreamHandler()
             console_handler.setLevel(log_level)
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
+            
+            # Also add a file handler for better debugging
+            try:
+                Path('logs').mkdir(exist_ok=True)
+                file_handler = logging.FileHandler('logs/royal_road_scraper.log')
+                file_handler.setLevel(log_level)
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
+            except Exception:
+                self.logger.warning("Could not create log file, continuing with console logging only")
             
         # Update session headers
         self.session.headers.update(self.HEADERS)
@@ -313,10 +323,19 @@ class RoyalRoadScraper:
             db.log_scrape(
                 pages_scraped = 1,  # Trending page is always 1 page
                 stories_added = added,
-                stories_updated= updated,
-                status="success",
-                notes=f"Scraped {len(stories)} stories total"
+                stories_updated = updated,
+                status = "success",
+                notes = f"Scraped {len(stories)} stories total, created {added + updated} snapshots"
             )
+            
+            # Calculate stats for user feedback
+            total_snapshots = db.get_snapshot_count()
+            print(f"\nDatabase now contains:")
+            print(f"- {added + updated} new snapshots created in this run")
+            print(f"- {total_snapshots} total snapshots")
+            print(f"- {added} new stories added")
+            print(f"- {updated} existing stories updated\n")
+            print("Time-series data is being preserved. Run the analysis notebook to see trends over time.")
 
         return added, updated
 

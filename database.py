@@ -26,12 +26,25 @@ class RoyalRoadDatabase:
     def _create_tables(self):
         """Create database tables if they do not exist"""
 
-        # Stories table
+        # Base Stories table - stores current metadata about each story
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS stories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                royal_road_id INTEGER UNIQUE,
                 title TEXT,
-                url TEXT UNIQUE,
+                url TEXT,
+                genres TEXT,
+                first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # Story Snapshots table - stores historical metrics for each story
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS story_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_id INTEGER,
+                snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 rating REAL,
                 followers INTEGER,
                 pages INTEGER,
@@ -39,8 +52,7 @@ class RoyalRoadDatabase:
                 views INTEGER,
                 favorites INTEGER,
                 ratings_count INTEGER,
-                genres TEXT,
-                scraped_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                FOREIGN KEY (story_id) REFERENCES stories(id)
             );
         """)
 
@@ -59,21 +71,57 @@ class RoyalRoadDatabase:
 
         # Create indexes for performance
         self.cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_stories_rating ON stories(rating)
-        """)
-        self.cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_stories_followers ON stories(followers)
+            CREATE INDEX IF NOT EXISTS idx_stories_royal_road_id ON stories(royal_road_id)
         """)
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_stories_url ON stories(url)
+        """)
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_story_snapshots_story_id ON story_snapshots(story_id)
+        """)
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_story_snapshots_date ON story_snapshots(snapshot_date)
+        """)
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_story_snapshots_rating ON story_snapshots(rating)
+        """)
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_story_snapshots_followers ON story_snapshots(followers)
+        """)
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_story_snapshots_views ON story_snapshots(views)
         """)
 
         self.conn.commit()
         print("Database tables created or verified.")
 
+    def _extract_royal_road_id(self, url: Optional[str]) -> Optional[int]:
+        """
+        Extract the RoyalRoad story ID from a URL
+        
+        Args:
+            url: The URL of the story
+            
+        Returns:
+            The RoyalRoad story ID as an integer or None if it couldn't be extracted
+        """
+        if not url:
+            return None
+            
+        import re
+        # URL format is typically https://www.royalroad.com/fiction/12345/story-title
+        match = re.search(r'/fiction/(\d+)/', url)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                print(f"Could not convert story ID to integer: {match.group(1)}")
+                return None
+        return None
+        
     def insert_story(self, story_data: Dict) -> Tuple[Optional[int], bool]:
         """
-        Insert a single story into the database 
+        Insert a single story into the database and create a snapshot of its current metrics
         
         Args:
             story_data: Dictionary containing story attributes
@@ -82,34 +130,68 @@ class RoyalRoadDatabase:
             Tuple of (story_id, is_new): ID of the inserted story and whether it was a new insert
         """
         try:
-            # Check if story exists first
-            self.cursor.execute("SELECT id FROM stories WHERE url = ?", (story_data.get('url'),))
+            # Extract Royal Road ID from URL
+            royal_road_id = self._extract_royal_road_id(story_data.get('url'))
+            
+            # Skip if we can't get a Royal Road ID
+            if royal_road_id is None:
+                print(f"Skipping story with invalid URL: {story_data.get('url')}")
+                return (None, False)
+                
+            # Check if story exists by Royal Road ID first
+            self.cursor.execute("SELECT id FROM stories WHERE royal_road_id = ?", (royal_road_id,))
             existing = self.cursor.fetchone()
             
-            # Insert or update story
+            is_new = existing is None
+            
+            if is_new:
+                # Insert new story
+                self.cursor.execute("""
+                    INSERT INTO stories (royal_road_id, title, url, genres, first_seen, last_updated)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (
+                    royal_road_id,
+                    story_data.get('title'),
+                    story_data.get('url'),
+                    story_data.get('genres')
+                ))
+                
+                # Get story ID
+                story_id = self.cursor.execute(
+                    "SELECT last_insert_rowid();"
+                ).fetchone()[0]
+            else:
+                # Update existing story's metadata and last_updated timestamp
+                story_id = existing[0]
+                self.cursor.execute("""
+                    UPDATE stories 
+                    SET title = ?, url = ?, genres = ?, last_updated = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (
+                    story_data.get('title'),
+                    story_data.get('url'),
+                    story_data.get('genres'),
+                    story_id
+                ))
+            
+            # Always insert a new snapshot with the current metrics
             self.cursor.execute("""
-                INSERT OR REPLACE INTO stories (title, url, rating, followers, pages, chapters, views, favorites, ratings_count, genres)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO story_snapshots 
+                (story_id, snapshot_date, rating, followers, pages, chapters, views, favorites, ratings_count)
+                VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                story_data.get('title'),
-                story_data.get('url'),
+                story_id,
                 story_data.get('rating'),
                 story_data.get('followers'),
                 story_data.get('pages'),
                 story_data.get('chapters'),
                 story_data.get('views'),
                 story_data.get('favorites'),
-                story_data.get('ratings_count'),
-                story_data.get('genres')
+                story_data.get('ratings_count')
             ))
 
-            # Get story ID
-            story_id = self.cursor.execute(
-                "SELECT last_insert_rowid();"
-            ).fetchone()[0]
-
             self.conn.commit()
-            return (story_id, existing is None)
+            return (story_id, is_new)
         
         except sqlite3.Error as e:
             print(f"Error inserting story: {e}")
@@ -129,39 +211,52 @@ class RoyalRoadDatabase:
         added = 0
         updated = 0
 
-        # Get all existing URLs first
-        self.cursor.execute("SELECT url FROM stories")
-        existing_urls = {row[0] for row in self.cursor.fetchall()}
+        # Get all existing Royal Road IDs first
+        self.cursor.execute("SELECT id, royal_road_id FROM stories")
+        existing_ids = {row[1]: row[0] for row in self.cursor.fetchall() if row[1] is not None}
         
         # Print current database state
         print(f"\nBefore update:")
-        print(f"Total stories in database: {len(existing_urls)}")
+        print(f"Total stories in database: {len(existing_ids)}")
 
         for story in stories:
-            url = story.get('url')
-            if not url:
+            # Extract Royal Road ID from URL
+            royal_road_id = self._extract_royal_road_id(story.get('url'))
+            if not royal_road_id:
+                print(f"Skipping story with invalid URL: {story.get('url')}")
                 continue
                 
-            if url in existing_urls:
-                # For updates, compare current values with new values
+            if royal_road_id in existing_ids:
+                # Check if we need to create a new snapshot by comparing with the most recent one
+                story_id = existing_ids[royal_road_id]
                 self.cursor.execute("""
                     SELECT rating, followers, chapters, views, favorites 
-                    FROM stories WHERE url = ?
-                """, (url,))
+                    FROM story_snapshots 
+                    WHERE story_id = ? 
+                    ORDER BY snapshot_date DESC 
+                    LIMIT 1
+                """, (story_id,))
+                
                 current = self.cursor.fetchone()
                 if current:
                     old_vals = dict(zip(['rating', 'followers', 'chapters', 'views', 'favorites'], current))
                     new_vals = {k: story.get(k) for k in old_vals.keys()}
-                    # Only count as update if values actually changed
+                    # Only insert a new snapshot if values actually changed
                     if any(old_vals[k] != new_vals[k] for k in old_vals.keys() if new_vals[k] is not None):
                         result = self.insert_story(story)
                         if result[0]:  # If update was successful
                             updated += 1
+                else:
+                    # No snapshots exist yet, create one
+                    result = self.insert_story(story)
+                    if result[0]:
+                        updated += 1
             else:
+                # This is a new story, add it
                 result = self.insert_story(story)
                 if result[0]:  # If insert was successful
                     added += 1
-                    existing_urls.add(url)
+                    existing_ids[royal_road_id] = result[0]  # Store the new ID
 
         self.conn.commit()
 
@@ -170,21 +265,35 @@ class RoyalRoadDatabase:
         self.cursor.execute("SELECT COUNT(*) FROM stories")
         total_stories = self.cursor.fetchone()[0]
         print(f"Total stories in database now: {total_stories}")
-        print(f"Stories scraped this run: {len(stories)}")
-        print(f"Stories added: {added}")
-        print(f"Stories updated: {updated}")
         
-        # Count stories with ratings
-        self.cursor.execute("SELECT COUNT(*) FROM stories WHERE rating IS NOT NULL")
+        self.cursor.execute("SELECT COUNT(*) FROM story_snapshots")
+        total_snapshots = self.cursor.fetchone()[0]
+        print(f"Total snapshots in database: {total_snapshots}")
+        
+        print(f"Stories scraped this run: {len(stories)}")
+        print(f"New stories added: {added}")
+        print(f"Existing stories updated: {updated}")
+        
+        # Count stories with ratings in the latest snapshots
+        self.cursor.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT s.id
+                FROM stories s
+                JOIN story_snapshots ss ON s.id = ss.story_id
+                WHERE ss.rating IS NOT NULL
+                GROUP BY s.id
+            )
+        """)
         stories_with_ratings = self.cursor.fetchone()[0]
         print(f"Stories with ratings: {stories_with_ratings}")
         
-        # Get some sample ratings
+        # Get some sample ratings from the most recent snapshots
         self.cursor.execute("""
-            SELECT title, rating, scraped_date 
-            FROM stories 
-            WHERE rating IS NOT NULL 
-            ORDER BY scraped_date DESC 
+            SELECT s.title, ss.rating, ss.snapshot_date 
+            FROM stories s
+            JOIN story_snapshots ss ON s.id = ss.story_id
+            WHERE ss.rating IS NOT NULL 
+            ORDER BY ss.snapshot_date DESC 
             LIMIT 5
         """)
         samples = self.cursor.fetchall()
@@ -229,6 +338,20 @@ class RoyalRoadDatabase:
         """Context manager entry."""
         return self
 
+    def get_snapshot_count(self) -> int:
+        """
+        Get the total number of snapshots in the database
+        
+        Returns:
+            Total number of story snapshots
+        """
+        try:
+            self.cursor.execute("SELECT COUNT(*) FROM story_snapshots")
+            return self.cursor.fetchone()[0]
+        except sqlite3.Error as e:
+            print(f"Error getting snapshot count: {e}")
+            return 0
+            
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()

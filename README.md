@@ -8,7 +8,7 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
 - **Data Storage**: SQLite database for efficient storage and retrieval of story metrics
 - **Exploratory Data Analysis**: Comprehensive analysis of story metrics, genres, and trends
 - **Visualization**: Interactive charts and plots to explore the data
-- **Time-series Analysis**: Track changes in story metrics over time with multiple manual data collections
+- **Time-series Analysis**: Track changes in story metrics over time with complete historical data preservation, adaptive period detection and dynamic visualizations
 
 ## Project Structure
 
@@ -31,8 +31,6 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
    .venv\Scripts\activate  # On Windows
    pip install -r requirements.txt
    ```
-
-
 
 ## Usage
 
@@ -63,13 +61,20 @@ The notebook provides:
 
 ## Database Structure
 
-The SQLite database (`data/royal_road.db`) contains two main tables:
+The SQLite database (`data/royal_road.db`) uses a time-series optimized structure with three main tables:
 
-1. `stories` - Stores story details and metrics
-   - id, title, url, rating, followers, pages, chapters, views, favorites, ratings_count, genres, scraped_date
+1. `stories` - Stores basic story information
+   - id, royal_road_id, title, url, genres, first_seen, last_updated
+   - Uses the Royal Road ID as a unique identifier (extracted from the URL)
+   - Handles title changes gracefully by tracking the persistent royal_road_id
 
-2. `scrape_history` - Logs each scraping session
+2. `story_snapshots` - Stores historical metrics for each story
+   - id, story_id, snapshot_date, rating, followers, pages, chapters, views, favorites, ratings_count
+
+3. `scrape_history` - Logs each scraping session
    - id, scrape_date, pages_scraped, stories_added, stories_updated, status, notes
+
+This structure preserves the complete history of each story's metrics over time, enabling robust time-series analysis without overwriting historical data. The system can properly track stories even when their titles (and thus URLs) change over time.
 
 ## Data Analysis Highlights
 
@@ -77,7 +82,51 @@ The SQLite database (`data/royal_road.db`) contains two main tables:
 - **Correlation Heatmaps**: Visualize relationships between different story metrics
 - **Genre Analysis**: Identify popular and high-performing genres
 - **Story Length Impact**: Understand how story length affects popularity metrics
-- **Time-Series Insights**: Track changes in story metrics over time (requires multiple manual scrapes)
+- **Time-Series Insights**: Adaptive time-series analysis with:
+  - Automatic period detection based on available data span
+  - Growth rate visualization for views and followers
+  - Genre performance over time
+  - Story popularity trend visualization
+  - Impact analysis of chapter updates on growth rates
+  - Relative growth comparison between stories
+
+## Time-Series Analysis Features
+
+The time-series analysis component leverages the complete historical snapshot database to provide comprehensive insights:
+
+- **Complete Historical Data**:
+  - Every data point is preserved in the database
+  - No overwriting of previous values
+  - Full history available for each story
+
+- **Adaptive Time Binning**: 
+  - Daily analysis for short collection periods (less than a week)
+  - Weekly analysis for medium collection periods (1-4 weeks)
+  - Monthly analysis for longer collection periods (1+ months)
+
+- **Growth Metrics**:
+  - Daily growth rates calculation for views and followers
+  - Snapshot-to-snapshot change analysis
+  - Statistical analysis of growth patterns (mean, median, min, max)
+  - Distribution visualization of growth rates
+
+- **Story Performance Tracking**:
+  - Time-series visualization of top stories' metrics
+  - Normalized relative growth comparison
+  - Impact analysis of chapter updates on growth rates
+
+- **Genre Performance Over Time**:
+  - Growth rate comparison across genres
+  - Identification of trending genres
+  - Visualization of genre performance differences
+
+- **Advanced Visualizations**:
+  - Interactive time-series plots
+  - Growth rate distribution histograms
+  - Growth vs. initial popularity scatter plots
+  - Genre performance bar charts
+
+To use these features, simply run the scraper multiple times on different days to collect time-series data.
 
 ## License
 
