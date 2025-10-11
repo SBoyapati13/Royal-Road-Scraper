@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import sqlite3
 from pathlib import Path
+from config import DATABASE_PATH, DASHBOARD_LATEST_QUERY, DASHBOARD_TIMESERIES_QUERY
 
 # Page configuration
 st.set_page_config(
@@ -16,27 +17,10 @@ st.set_page_config(
 def load_data():
     """Load data from SQLite database"""
     try:
-        db_path = Path('data/royal_road.db')
+        db_path = Path(DATABASE_PATH)
         conn = sqlite3.connect(db_path)
         
-        # Modified query to get the latest snapshot data for each story
-        query = """
-        SELECT s.royal_road_id, s.title, s.url, s.genres, 
-               COALESCE(ss.rating, 0) as rating,
-               COALESCE(ss.followers, 0) as followers,
-               COALESCE(ss.views, 0) as views,
-               COALESCE(ss.chapters, 0) as chapters,
-               ss.snapshot_date
-        FROM stories s
-        JOIN (
-            SELECT story_id, MAX(snapshot_date) as max_date
-            FROM story_snapshots
-            GROUP BY story_id
-        ) latest ON s.id = latest.story_id
-        JOIN story_snapshots ss ON latest.story_id = ss.story_id AND latest.max_date = ss.snapshot_date
-        """
-        
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query(DASHBOARD_LATEST_QUERY, conn)
         conn.close()
         
         # Expand genres into a list
@@ -130,15 +114,9 @@ def main():
         # Create a function to load time series data
         @st.cache_data
         def load_time_series_data():
-            db_path = Path('data/royal_road.db')
+            db_path = Path(DATABASE_PATH)
             conn = sqlite3.connect(db_path)
-            query = """
-            SELECT s.title, ss.snapshot_date, ss.views, ss.followers, ss.rating
-            FROM stories s
-            JOIN story_snapshots ss ON s.id = ss.story_id
-            ORDER BY s.title, ss.snapshot_date
-            """
-            ts_df = pd.read_sql_query(query, conn)
+            ts_df = pd.read_sql_query(DASHBOARD_TIMESERIES_QUERY, conn)
             conn.close()
             ts_df['snapshot_date'] = pd.to_datetime(ts_df['snapshot_date'])
             return ts_df
@@ -156,27 +134,65 @@ def main():
             # Filter data for the selected story
             story_data = ts_df[ts_df['title'] == selected_story]
             
-            # Create a time series plot
-            fig = px.line(
-                story_data, 
-                x='snapshot_date', 
-                y=['views', 'followers'], 
+            # Create a time series plot with lines and points
+            fig = go.Figure()
+            
+            # Add views with markers and lines
+            fig.add_trace(go.Scatter(
+                x=story_data['snapshot_date'],
+                y=story_data['views'],
+                mode='lines+markers',
+                name='Views',
+                line=dict(width=2),
+                marker=dict(size=8),
+                hovertemplate='%{x|%Y-%m-%d}<br>%{y:,.0f} views<extra></extra>'
+            ))
+            
+            # Add followers with markers and lines
+            fig.add_trace(go.Scatter(
+                x=story_data['snapshot_date'],
+                y=story_data['followers'],
+                mode='lines+markers',
+                name='Followers',
+                line=dict(width=2),
+                marker=dict(size=8),
+                hovertemplate='%{x|%Y-%m-%d}<br>%{y:,.0f} followers<extra></extra>'
+            ))
+            
+            fig.update_layout(
                 title=f'Metrics Over Time for "{selected_story}"',
-                labels={'snapshot_date': 'Date', 'value': 'Count', 'variable': 'Metric'}
+                xaxis_title='Date',
+                yaxis_title='Count',
+                hovermode="closest",
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01
+                )
             )
-            fig.update_layout(hovermode="x unified")
             st.plotly_chart(fig, width='stretch')
             
             # Create a second chart for rating
             if not story_data['rating'].isna().all():
-                fig2 = px.line(
-                    story_data,
-                    x='snapshot_date',
-                    y='rating',
+                fig2 = go.Figure()
+                
+                fig2.add_trace(go.Scatter(
+                    x=story_data['snapshot_date'],
+                    y=story_data['rating'],
+                    mode='lines+markers',
+                    name='Rating',
+                    line=dict(width=2, color='green'),
+                    marker=dict(size=8, color='green'),
+                    hovertemplate='%{x|%Y-%m-%d}<br>Rating: %{y:.2f}<extra></extra>'
+                ))
+                
+                fig2.update_layout(
                     title=f'Rating Over Time for "{selected_story}"',
-                    labels={'snapshot_date': 'Date', 'rating': 'Rating'}
+                    xaxis_title='Date',
+                    yaxis_title='Rating',
+                    hovermode="closest"
                 )
-                fig2.update_layout(hovermode="x unified")
                 st.plotly_chart(fig2, width='stretch')
                 
             # Calculate and show growth metrics if we have at least two data points
@@ -272,32 +288,82 @@ def main():
                 metric = st.selectbox("Select Growth Metric:", ["Views", "Followers"])
                 
                 if metric == "Views":
-                    fig = px.scatter(
-                        growth_df, 
-                        x='initial_views', 
-                        y='views_per_day',
-                        hover_name='title',
-                        labels={
-                            'initial_views': 'Initial Views',
-                            'views_per_day': 'Views Growth Per Day'
-                        },
-                        title='Views Growth Rate vs Initial Popularity'
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=growth_df['initial_views'],
+                        y=growth_df['views_per_day'],
+                        mode='markers',
+                        name='Stories',
+                        marker=dict(
+                            size=10,
+                            opacity=0.7,
+                            color='blue',
+                            line=dict(width=1, color='darkblue')
+                        ),
+                        text=growth_df['title'],
+                        hovertemplate='<b>%{text}</b><br>Initial Views: %{x:,.0f}<br>Growth: %{y:.1f} views/day<extra></extra>'
+                    ))
+                    
+                    # Add a trend line using numpy polyfit
+                    import numpy as np
+                    z = np.polyfit(growth_df['initial_views'], growth_df['views_per_day'], 1)
+                    p = np.poly1d(z)
+                    x_range = np.linspace(growth_df['initial_views'].min(), growth_df['initial_views'].max(), 100)
+                    
+                    fig.add_trace(go.Scatter(
+                        x=x_range,
+                        y=p(x_range),
+                        mode='lines',
+                        name='Trend',
+                        line=dict(color='red', dash='dash')
+                    ))
+                    
+                    fig.update_layout(
+                        title='Views Growth Rate vs Initial Popularity',
+                        xaxis_title='Initial Views',
+                        yaxis_title='Views Growth Per Day',
+                        hovermode="closest"
                     )
                 else:
-                    fig = px.scatter(
-                        growth_df, 
-                        x='initial_followers', 
-                        y='followers_per_day',
-                        hover_name='title',
-                        labels={
-                            'initial_followers': 'Initial Followers',
-                            'followers_per_day': 'Followers Growth Per Day'
-                        },
-                        title='Followers Growth Rate vs Initial Popularity'
+                    fig = go.Figure()
+                    
+                    fig.add_trace(go.Scatter(
+                        x=growth_df['initial_followers'],
+                        y=growth_df['followers_per_day'],
+                        mode='markers',
+                        name='Stories',
+                        marker=dict(
+                            size=10,
+                            opacity=0.7,
+                            color='purple',
+                            line=dict(width=1, color='#330066')  # Dark purple hex color
+                        ),
+                        text=growth_df['title'],
+                        hovertemplate='<b>%{text}</b><br>Initial Followers: %{x:,.0f}<br>Growth: %{y:.1f} followers/day<extra></extra>'
+                    ))
+                    
+                    # Add a trend line using numpy polyfit
+                    import numpy as np
+                    z = np.polyfit(growth_df['initial_followers'], growth_df['followers_per_day'], 1)
+                    p = np.poly1d(z)
+                    x_range = np.linspace(growth_df['initial_followers'].min(), growth_df['initial_followers'].max(), 100)
+                    
+                    fig.add_trace(go.Scatter(
+                        x=x_range,
+                        y=p(x_range),
+                        mode='lines',
+                        name='Trend',
+                        line=dict(color='red', dash='dash')
+                    ))
+                    
+                    fig.update_layout(
+                        title='Followers Growth Rate vs Initial Popularity',
+                        xaxis_title='Initial Followers',
+                        yaxis_title='Followers Growth Per Day',
+                        hovermode="closest"
                     )
                 
-                # Add a trend line
-                fig.update_layout(hovermode="closest")
                 st.plotly_chart(fig, width='stretch')
                 
                 # Show top growers
