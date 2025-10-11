@@ -6,14 +6,45 @@ import re
 import logging
 from pathlib import Path
 from database import RoyalRoadDatabase
+from config import BASE_URL, HEADERS, DATABASE_PATH
 
 class RoyalRoadScraper:
     """Scraper for RoyalRoad stories and chapters"""
 
-    BASE_URL = "https://www.royalroad.com"
-    HEADERS = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
+    def __init__(self, delay: float = 1.5, log_level: int = logging.DEBUG):
+        """Initialize the scraper with delay and logging configuration.
+
+        Args:
+            delay: Delay between requests in seconds
+            log_level: Logging level (default: logging.DEBUG)
+        """
+        self.BASE_URL = BASE_URL
+        self.HEADERS = HEADERS
+        self.delay = delay
+        self.session = requests.Session()
+        self.session.headers.update(self.HEADERS)
+        
+        # Configure logging
+        self.logger = logging.getLogger('RoyalRoadScraper')
+        self.logger.setLevel(log_level)
+        
+        # Create console handler with formatting if it doesn't exist
+        if not self.logger.handlers:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(log_level)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
+            
+            # Also add a file handler for better debugging
+            try:
+                Path('logs').mkdir(exist_ok=True)
+                file_handler = logging.FileHandler('logs/royal_road_scraper.log')
+                file_handler.setLevel(log_level)
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
+            except Exception:
+                self.logger.warning("Could not create log file, continuing with console logging only")
     
     def _extract_story_stats(self, soup: BeautifulSoup) -> Dict[str, Union[int, float]]:
         """Extract statistics from a story page.
@@ -154,41 +185,6 @@ class RoyalRoadScraper:
             self.logger.debug(f"Failed to parse number from '{text}': {e}")
             return None
 
-    def __init__(self, delay: float = 1.5, log_level: int = logging.DEBUG):
-        """Initialize the scraper with delay and logging configuration.
-
-        Args:
-            delay: Delay between requests in seconds
-            log_level: Logging level (default: logging.DEBUG)
-        """
-        self.delay = delay
-        self.session = requests.Session()
-        
-        # Configure logging
-        self.logger = logging.getLogger('RoyalRoadScraper')
-        self.logger.setLevel(log_level)
-        
-        # Create console handler with formatting if it doesn't exist
-        if not self.logger.handlers:
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(log_level)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
-            
-            # Also add a file handler for better debugging
-            try:
-                Path('logs').mkdir(exist_ok=True)
-                file_handler = logging.FileHandler('logs/royal_road_scraper.log')
-                file_handler.setLevel(log_level)
-                file_handler.setFormatter(formatter)
-                self.logger.addHandler(file_handler)
-            except Exception:
-                self.logger.warning("Could not create log file, continuing with console logging only")
-            
-        # Update session headers
-        self.session.headers.update(self.HEADERS)
-
     def scrape_top_stories(self) -> List[Dict]:
         """
         Scrapes the top stories from Royal Road's trending page.
@@ -303,7 +299,7 @@ class RoyalRoadScraper:
             traceback.print_exc()
             return None
     
-    def save_to_database(self, stories: List[Dict], db_path: str = 'data/royal_road.db'):
+    def save_to_database(self, stories: List[Dict], db_path: str = DATABASE_PATH):
         """
         Saves the list of stories to a SQLite database.
         

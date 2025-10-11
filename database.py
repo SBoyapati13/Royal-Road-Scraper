@@ -1,6 +1,7 @@
 import sqlite3
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
+from config import DATABASE_PATH
 
 class RoyalRoadDatabase:
     """Database manager for Royalroad story data"""
@@ -9,7 +10,7 @@ class RoyalRoadDatabase:
     conn: sqlite3.Connection
     cursor: sqlite3.Cursor
 
-    def __init__(self, db_path: str = 'data/royal_road.db'):
+    def __init__(self, db_path: str = DATABASE_PATH):
         """Initialize database connection."""
         self.db_path = db_path
         self.conn = None  # type: ignore
