@@ -7,6 +7,7 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
 - **Web Scraping**: Collection of story data from Royal Road's trending page
 - **Data Storage**: SQLite database for efficient storage and retrieval of story metrics
 - **Exploratory Data Analysis**: Comprehensive analysis of story metrics, genres, and trends
+- **Interactive Dashboard**: Streamlit-based web interface for exploring data
 - **Visualization**: Interactive charts and plots to explore the data
 - **Time-series Analysis**: Track changes in story metrics over time with complete historical data preservation, adaptive period detection and dynamic visualizations
 
@@ -14,7 +15,11 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
 
 - `scraper.py` - The main scraper module that extracts data from Royal Road
 - `database.py` - Database handling for storing and retrieving scraped data
+- `dashboard.py` - Streamlit web interface for interactive data exploration
 - `royal_road_eda.ipynb` - Jupyter notebook for exploratory data analysis
+- `config.py` - Centralized configuration and constants
+- `utils.py` - Common utility functions for data operations
+- `check_db.py` - Database status checker and statistics tool
 - `requirements.txt` - Python package dependencies
 
 ## Setup
@@ -44,12 +49,35 @@ python scraper.py
 
 For time-series analysis, it's recommended to run the scraper multiple times daily at regular intervals.
 
+### Interactive Dashboard
+
+Launch the Streamlit dashboard for web-based data exploration:
+
+```
+streamlit run dashboard.py
+```
+
+The dashboard provides:
+- Real-time data overview with key metrics
+- Genre analysis and distribution charts
+- Interactive story listings
+- Time-series visualization for tracked stories
+- Growth rate analysis and comparisons
+
 ### Data Analysis
 
-Open the Jupyter notebook for analysis:
+Open the Jupyter notebook for detailed analysis:
 
 ```
 jupyter notebook royal_road_eda.ipynb
+```
+
+### Database Status
+
+Check your database status anytime:
+
+```
+python check_db.py
 ```
 
 The notebook provides:
