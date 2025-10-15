@@ -1,7 +1,7 @@
 import requests
-from bs4 import BeautifulSoup, Tag, NavigableString
+from bs4 import BeautifulSoup, Tag
 import time
-from typing import List, Dict, Optional, Tuple, Union, cast
+from typing import List, Dict, Optional, Tuple, Union
 import re
 import logging
 from pathlib import Path
