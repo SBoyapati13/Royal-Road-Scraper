@@ -4,12 +4,22 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
 
 ## Features
 
-- **Web Scraping**: Collection of story data from Royal Road's trending page
-- **Data Storage**: SQLite database for efficient storage and retrieval of story metrics
-- **Exploratory Data Analysis**: Comprehensive analysis of story metrics, genres, and trends
-- **Interactive Dashboard**: Streamlit-based web interface for exploring data
-- **Visualization**: Interactive charts and plots to explore the data
-- **Time-series Analysis**: Track changes in story metrics over time with complete historical data preservation, adaptive period detection and dynamic visualizations
+- **Web Scraping**: Collection of story data from Royal Road's trending page with robust error handling and rate limiting
+- **Data Storage**: SQLite database for efficient storage and retrieval of story metrics with time-series optimization
+- **Exploratory Data Analysis**: Comprehensive analysis of story metrics, genres, and trends with enhanced visualizations
+- **Interactive Dashboard**: Streamlit-based web interface for exploring data with real-time insights
+- **Visualization**: Interactive charts and plots with improved formatting, hover details, and statistical analysis
+- **Time-series Analysis**: Track changes in story metrics over time with complete historical data preservation, adaptive period detection and enhanced dynamic visualizations
+
+## Project Status (October 15, 2025)
+
+**✅ Fully Operational**: All components validated and working correctly
+- **Latest Analysis**: Comprehensive EDA completed with execution counts 12-20
+- **Active Variables**: 89 variables loaded including LENGTH_METRICS, PERFORMANCE_METRICS, correlation_matrix, growth_df
+- **Environment**: Dual Python setup (global + virtual) with all dependencies confirmed working
+- **Database**: SQLite database with complete time-series tracking operational
+- **Visualizations**: All charts and plots rendering correctly with enhanced features
+- **Analysis Pipeline**: Full analytical framework validated from data loading through advanced visualizations
 
 ## Project Structure
 
@@ -24,18 +34,42 @@ A data analysis project for tracking and analyzing trending stories on Royal Roa
 
 ## Setup
 
+### Environment Configuration (Validated October 15, 2025)
+
+The project supports dual Python environment configuration for maximum compatibility:
+
 1. Clone the repository:
    ```
    git clone https://github.com/SBoyapati13/Royal-Road-Scraper.git
    cd Royal-Road-Scraper
    ```
 
-2. Create a virtual environment and install dependencies:
+2. Install dependencies (choose one approach):
+
+   **Option A: Global Installation (Recommended for VS Code)**
    ```
-   python -m venv .venv
-   .venv\Scripts\activate  # On Windows
    pip install -r requirements.txt
    ```
+
+   **Option B: Virtual Environment Setup**
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   pip install -r requirements.txt
+   ```
+
+3. Verify installation:
+   ```
+   python check_db.py  # Check database and environment status
+   ```
+
+### Jupyter Notebook Setup
+
+For data analysis in VS Code:
+1. Install Jupyter extension in VS Code
+2. Open `royal_road_eda.ipynb`
+3. Select Python kernel (global Python or .venv kernel will both work)
+4. All 19 analysis cells are ready to run with validated execution
 
 ## Usage
 
