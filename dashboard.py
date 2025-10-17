@@ -8,7 +8,7 @@ from config import DATABASE_PATH, DASHBOARD_LATEST_QUERY, DASHBOARD_TIMESERIES_Q
 
 # Page configuration
 st.set_page_config(
-    page_title="📚 Royal Road Trending Stories Analyzer",
+    page_title="Royal Road Trending Stories Analyzer",
     page_icon="📚",
     layout="wide"
 )
@@ -134,44 +134,49 @@ def main():
             # Filter data for the selected story
             story_data = ts_df[ts_df['title'] == selected_story]
             
-            # Create a time series plot with lines and points
-            fig = go.Figure()
+            # Create separate charts for views and followers due to scaling differences
             
-            # Add views with markers and lines
-            fig.add_trace(go.Scatter(
+            # Views chart
+            fig_views = go.Figure()
+            fig_views.add_trace(go.Scatter(
                 x=story_data['snapshot_date'],
                 y=story_data['views'],
                 mode='lines+markers',
                 name='Views',
-                line=dict(width=2),
-                marker=dict(size=8),
+                line=dict(width=2, color='blue'),
+                marker=dict(size=8, color='blue'),
                 hovertemplate='%{x|%Y-%m-%d}<br>%{y:,.0f} views<extra></extra>'
             ))
             
-            # Add followers with markers and lines
-            fig.add_trace(go.Scatter(
+            fig_views.update_layout(
+                title=f'Views Over Time for "{selected_story}"',
+                xaxis_title='Date',
+                yaxis_title='Views',
+                hovermode="closest",
+                showlegend=False
+            )
+            st.plotly_chart(fig_views, width='stretch')
+            
+            # Followers chart
+            fig_followers = go.Figure()
+            fig_followers.add_trace(go.Scatter(
                 x=story_data['snapshot_date'],
                 y=story_data['followers'],
                 mode='lines+markers',
                 name='Followers',
-                line=dict(width=2),
-                marker=dict(size=8),
+                line=dict(width=2, color='purple'),
+                marker=dict(size=8, color='purple'),
                 hovertemplate='%{x|%Y-%m-%d}<br>%{y:,.0f} followers<extra></extra>'
             ))
             
-            fig.update_layout(
-                title=f'Metrics Over Time for "{selected_story}"',
+            fig_followers.update_layout(
+                title=f'Followers Over Time for "{selected_story}"',
                 xaxis_title='Date',
-                yaxis_title='Count',
+                yaxis_title='Followers',
                 hovermode="closest",
-                legend=dict(
-                    yanchor="top",
-                    y=0.99,
-                    xanchor="left",
-                    x=0.01
-                )
+                showlegend=False
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig_followers, width='stretch')
             
             # Create a second chart for rating
             if not story_data['rating'].isna().all():
